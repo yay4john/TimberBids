@@ -79,15 +79,19 @@ for district in districts:
 
                 # if the column is not an empty list, grab the 4 main fields, plus the details needed for post request
                 if(columns != []):
+                    try:
+                        # check if this is the header row, ignore if it is
+                        if columns[1].text.strip() != 'Species':
+                            Volume = columns[0].text.strip()
+                            Species = columns[1].text.strip()
+                            Price = columns[2].text.strip()
 
-                    # check if this is the header row, ignore if it is
-                    if columns[1].text.strip() != 'Species':
-                        Volume = columns[0].text.strip()
-                        Species = columns[1].text.strip()
-                        Price = columns[2].text.strip()
-
-                        dfAppraisals = dfAppraisals.append({'SaleID': auctionSaleID, 'Volume': Volume,  'Species': Species, 'Price': Price}
-                        , ignore_index=True)
+                            dfAppraisals = dfAppraisals.append({'SaleID': auctionSaleID, 'Volume': Volume,  'Species': Species, 'Price': Price}
+                            , ignore_index=True)
+                    except:
+                        dfAppraisals = dfAppraisals.append({'SaleID': auctionSaleID, 'Volume': 'manual',  'Species': 'manual', 'Price': 'manual'}
+                            , ignore_index=True)
+                        continue
 
         winner = auctionSoup.select('body > table:nth-child(7)')        # next, get the winning bid details
 
@@ -98,22 +102,25 @@ for district in districts:
                 
                 # if the column is not an empty list, grab the 4 main fields, plus the details needed for post request
                 if columns != []:
+                    try:
+                        # check if this is the header row, ignore if it is
+                        if columns[2].text.strip() != 'Bid Species':
 
-                    # check if this is the header row, ignore if it is
-                    if columns[2].text.strip() != 'Bid Species':
+                            # odf format has the table in tabular format, so the nth row for a bidder will have one fewer column
+                            if len(columns)==5:
+                                Bidder = columns[0].text.strip()
+                                Price = columns[1].text.strip()
+                                Species = columns[2].text.strip()
 
-                        # odf format has the table in tabular format, so the nth row for a bidder will have one fewer column
-                        if len(columns)==5:
-                            Bidder = columns[0].text.strip()
-                            Price = columns[1].text.strip()
-                            Species = columns[2].text.strip()
+                            else:    
+                                Price = columns[0].text.strip()
+                                Species = columns[1].text.strip()
 
-                        else:    
-                            Price = columns[0].text.strip()
-                            Species = columns[1].text.strip()
-
-                        dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': Bidder,  'Species': Species, 'Price': Price, 'Winner' : 1}
-                        , ignore_index=True)
+                            dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': Bidder,  'Species': Species, 'Price': Price, 'Winner' : 1}
+                            , ignore_index=True)
+                    except:
+                        dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': 'manual',  'Species': 'manual', 'Price': 'manual', 'Winner' : 1}
+                            , ignore_index=True)
 
         otherBids = auctionSoup.select('body > table:nth-child(9)')     # now grab the other bidder details
 
@@ -124,22 +131,25 @@ for district in districts:
                 
                 # if the column is not an empty list, grab the 4 main fields, plus the details needed for post request
                 if columns != []:
+                    try:
+                        # check if this is the header row, ignore if it is
+                        if columns[1].text.strip() != 'Bid Species':
 
-                    # check if this is the header row, ignore if it is
-                    if columns[1].text.strip() != 'Bid Species':
+                            # odf format has the table in tabular format, so the nth row for a bidder will have one fewer column
+                            if len(columns)==5:
+                                Bidder = columns[0].text.strip()
+                                Species = columns[1].text.strip()
+                                Price = columns[2].text.strip()
 
-                        # odf format has the table in tabular format, so the nth row for a bidder will have one fewer column
-                        if len(columns)==5:
-                            Bidder = columns[0].text.strip()
-                            Species = columns[1].text.strip()
-                            Price = columns[2].text.strip()
+                            else:    
+                                Species = columns[0].text.strip()
+                                Price = columns[1].text.strip()
 
-                        else:    
-                            Species = columns[0].text.strip()
-                            Price = columns[1].text.strip()
-
-                        dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': Bidder,  'Species': Species, 'Price': Price, 'Winner' : 0}
-                        , ignore_index=True)
+                            dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': Bidder,  'Species': Species, 'Price': Price, 'Winner' : 0}
+                            , ignore_index=True)
+                    except:
+                        dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': 'manual',  'Species': 'manual', 'Price': 'manual', 'Winner' : 0}
+                            , ignore_index=True)
         
         time.sleep(random.randrange(5,20)) # pause after grabbing the auction results to ease server load
     
