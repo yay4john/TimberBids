@@ -155,6 +155,10 @@ for district in districts:
     
     time.sleep(random.randrange(5,20)) # pause after grabbing the list of auctions to ease server load
 
-# print(dfAuctions)
-# print(dfAppraisals)
-# print(dfBids)
+print(dfAuctions)
+print(dfAppraisals)
+print(dfBids)
+
+dfAuctions.to_csv('ODF_Auctions.csv')
+dfAppraisals.to_csv('ODF_Appraisals.csv')
+dfBids.to_csv('ODF_Bids.csv')
