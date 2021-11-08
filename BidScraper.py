@@ -22,16 +22,20 @@ auctionTiming = ['Current','Archived']
 # Set base address to the ODF timber bid results page
 baseURL = 'https://apps.odf.oregon.gov/Divisions/management/asset_management/'
 
+# pass contact info in case the webmaster needs it
+headers = {'user-agent' : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36;'+
+'John Cox/john.cox@interfor.com'}
+
 #----------------------------------------------------------------------------------------------------------------------
 # The loop below goes through each district page and pulls a list of auctions. We then go to each auction's result page
 #  and pull out the appraisal and bid info
 #----------------------------------------------------------------------------------------------------------------------
-for time in auctionTiming:
+for auctionTime in auctionTiming:
     for district in districts:
-        link = baseURL + 'ResultsSelection.asp?optDist=' + district + '&Arc=' + time    #assemble the district url
+        link = baseURL + 'ResultsSelection.asp?optDist=' + district + '&Arc=' + auctionTime    #assemble the district url
         
         # get the html and parse it
-        page = requests.get(link, timeout=10.0).text
+        page = requests.get(link, timeout=10.0, headers=headers).text
         soup = BeautifulSoup(page, 'html5lib')
 
         tables = soup.find_all('table',attrs={'width':'710'})   # Find the subtables that contain auction details
@@ -70,9 +74,15 @@ for time in auctionTiming:
             newURL = dfAuctions.iloc[i,4]
             poststuff = json.loads(dfAuctions.iloc[i,5])
 
+            # get the start time for the loop. Used to adaptively alter the sleep time to avoid overloading server resources
+            start = time.time()
+
             # get the auction results page html and parse it
-            auction = requests.post(newURL,data = poststuff,timeout=10.0).text
+            auction = requests.post(newURL,data = poststuff,timeout=10.0,headers=headers).text
             auctionSoup = BeautifulSoup(auction, 'html5lib')
+
+            # calculate the time it took for the page to load
+            delay = time.time() - start
 
             appraisal = auctionSoup.select('body > p:nth-child(4) > table')     # grab the appraisal table
 
@@ -155,7 +165,7 @@ for time in auctionTiming:
                             dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': 'manual',  'Species': 'manual', 'Price': 'manual', 'Winner' : 0}
                                 , ignore_index=True)
             
-            time.sleep(random.randrange(0,10)) # pause after grabbing the auction results to ease server load
+            time.sleep(random.uniform(1,3)*delay) # pause after grabbing the auction results to ease server load. Base delay on page load time
 
 print(dfAuctions)
 print(dfAppraisals)
