@@ -66,111 +66,114 @@ for auctionTime in auctionTiming:
         dfAuctions['Link'] = dfAuctions['Link'].str.replace(' ','%20')
         dfAuctions['Link'] = dfAuctions['Link'].str.replace("'",'%27')
 
-        # now that we have a list of auctions, go to each auction site and pull appraisal and bid details
-        for i in range(len(dfAuctions)):
+# now that we have a list of auctions, go to each auction site and pull appraisal and bid details
+for i in range(len(dfAuctions)):
 
-            # grab the sale url and post info, along with the sale id, which we'll use as a key
-            auctionSaleID = dfAuctions.iloc[i,2]
-            newURL = dfAuctions.iloc[i,4]
-            poststuff = json.loads(dfAuctions.iloc[i,5])
+    # grab the sale url and post info, along with the sale id, which we'll use as a key
+    auctionSaleID = dfAuctions.iloc[i,2]
+    newURL = dfAuctions.iloc[i,4]
+    poststuff = json.loads(dfAuctions.iloc[i,5])
 
-            # get the start time for the loop. Used to adaptively alter the sleep time to avoid overloading server resources
-            start = time.time()
+    # get the start time for the loop. Used to adaptively alter the sleep time to avoid overloading server resources
+    start = time.time()
 
-            # get the auction results page html and parse it
-            auction = requests.post(newURL,data = poststuff,timeout=10.0,headers=headers).text
-            auctionSoup = BeautifulSoup(auction, 'html5lib')
+    # get the auction results page html and parse it
+    auction = requests.post(newURL,data = poststuff,timeout=10.0,headers=headers).text
+    auctionSoup = BeautifulSoup(auction, 'html5lib')
 
-            # calculate the time it took for the page to load
-            delay = time.time() - start
+    # calculate the time it took for the page to load
+    delay = time.time() - start
 
-            appraisal = auctionSoup.select('body > p:nth-child(4) > table')     # grab the appraisal table
+    appraisal = auctionSoup.select('body > p:nth-child(4) > table')     # grab the appraisal table
 
-            # for each table in the list (in this case, just the one), pull out each row and its columns
-            for tb in appraisal:
-                for row in tb.find_all('tr'):
-                    columns = row.find_all('td')
+    # for each table in the list (in this case, just the one), pull out each row and its columns
+    for tb in appraisal:
+        for row in tb.find_all('tr'):
+            columns = row.find_all('td')
 
-                    # if the column is not an empty list, grab the 4 main fields, plus the details needed for post request
-                    if(columns != []):
-                        try:
-                            # check if this is the header row, ignore if it is
-                            if columns[1].text.strip() != 'Species':
-                                Volume = columns[0].text.strip()
-                                Species = columns[1].text.strip()
-                                Price = columns[2].text.strip()
+            # if the column is not an empty list, grab the appraisal details and append to the df
+            # note that a few of the auctions are in a different format; we use try...catch for these and label them as 'manual'
+            if(columns != []):
+                try:
+                    # check if this is the header row, ignore if it is
+                    if columns[1].text.strip() != 'Species':
+                        Volume = columns[0].text.strip()
+                        Species = columns[1].text.strip()
+                        Price = columns[2].text.strip()
 
-                                dfAppraisals = dfAppraisals.append({'SaleID': auctionSaleID, 'Volume': Volume,  'Species': Species, 'Price': Price}
-                                , ignore_index=True)
-                        except:
-                            dfAppraisals = dfAppraisals.append({'SaleID': auctionSaleID, 'Volume': 'manual',  'Species': 'manual', 'Price': 'manual'}
-                                , ignore_index=True)
-                            continue
+                        dfAppraisals = dfAppraisals.append({'SaleID': auctionSaleID, 'Volume': Volume,  'Species': Species, 'Price': Price}
+                        , ignore_index=True)
+                except:
+                    dfAppraisals = dfAppraisals.append({'SaleID': auctionSaleID, 'Volume': 'manual',  'Species': 'manual', 'Price': 'manual'}
+                        , ignore_index=True)
+                    continue
 
-            winner = auctionSoup.select('body > table:nth-child(7)')        # next, get the winning bid details
+    winner = auctionSoup.select('body > table:nth-child(7)')        # next, get the winning bid details
 
-            # for each table in the list (again, there's only one), pull out each row and its columns
-            for each in winner:
-                for row in each.find_all('tr'):
-                    columns = row.find_all('td')
-                    
-                    # if the column is not an empty list, grab the 4 main fields, plus the details needed for post request
-                    if columns != []:
-                        try:
-                            # check if this is the header row, ignore if it is
-                            if columns[2].text.strip() != 'Bid Species':
-
-                                # odf format has the table in tabular format, so the nth row for a bidder will have one fewer column
-                                if len(columns)==5:
-                                    Bidder = columns[0].text.strip()
-                                    Price = columns[1].text.strip()
-                                    Species = columns[2].text.strip()
-
-                                else:    
-                                    Price = columns[0].text.strip()
-                                    Species = columns[1].text.strip()
-
-                                dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': Bidder,  'Species': Species, 'Price': Price, 'Winner' : 1}
-                                , ignore_index=True)
-                        except:
-                            dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': 'manual',  'Species': 'manual', 'Price': 'manual', 'Winner' : 1}
-                                , ignore_index=True)
-
-            otherBids = auctionSoup.select('body > table:nth-child(9)')     # now grab the other bidder details
-
-            # same as above, pull out each row and its columns
-            for each in otherBids:
-                for row in each.find_all('tr'):
-                    columns = row.find_all('td')
-                    
-                    # if the column is not an empty list, grab the 4 main fields, plus the details needed for post request
-                    if columns != []:
-                        try:
-                            # check if this is the header row, ignore if it is
-                            if columns[1].text.strip() != 'Bid Species':
-
-                                # odf format has the table in tabular format, so the nth row for a bidder will have one fewer column
-                                if len(columns)==5:
-                                    Bidder = columns[0].text.strip()
-                                    Species = columns[1].text.strip()
-                                    Price = columns[2].text.strip()
-
-                                else:    
-                                    Species = columns[0].text.strip()
-                                    Price = columns[1].text.strip()
-
-                                dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': Bidder,  'Species': Species, 'Price': Price, 'Winner' : 0}
-                                , ignore_index=True)
-                        except:
-                            dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': 'manual',  'Species': 'manual', 'Price': 'manual', 'Winner' : 0}
-                                , ignore_index=True)
+    # for each table in the list (again, there's only one), pull out each row and its columns
+    for each in winner:
+        for row in each.find_all('tr'):
+            columns = row.find_all('td')
             
-            time.sleep(random.uniform(1,3)*delay) # pause after grabbing the auction results to ease server load. Base delay on page load time
+            # if the column is not an empty list, get the winning results. Again, use try...catch for the atypical formats
+            if columns != []:
+                try:
+                    # check if this is the header row, ignore if it is
+                    if columns[2].text.strip() != 'Bid Species':
 
+                        # odf format has the table in tabular format, so the nth row for a bidder will have one fewer column
+                        if len(columns)==5:
+                            Bidder = columns[0].text.strip()
+                            Price = columns[1].text.strip()
+                            Species = columns[2].text.strip()
+
+                        else:    
+                            Price = columns[0].text.strip()
+                            Species = columns[1].text.strip()
+
+                        dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': Bidder,  'Species': Species, 'Price': Price, 'Winner' : 1}
+                        , ignore_index=True)
+                except:
+                    dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': 'manual',  'Species': 'manual', 'Price': 'manual', 'Winner' : 1}
+                        , ignore_index=True)
+
+    otherBids = auctionSoup.select('body > table:nth-child(9)')     # now grab the other bidder details
+
+    # same as above, pull out each row and its columns
+    for each in otherBids:
+        for row in each.find_all('tr'):
+            columns = row.find_all('td')
+            
+            # if the column is not an empty list, grab the details of the unsuccessful bids; same try...catch as above
+            if columns != []:
+                try:
+                    # check if this is the header row, ignore if it is
+                    if columns[1].text.strip() != 'Bid Species':
+
+                        # odf format has the table in tabular format, so the nth row for a bidder will have one fewer column
+                        if len(columns)==5:
+                            Bidder = columns[0].text.strip()
+                            Species = columns[1].text.strip()
+                            Price = columns[2].text.strip()
+
+                        else:    
+                            Species = columns[0].text.strip()
+                            Price = columns[1].text.strip()
+
+                        dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': Bidder,  'Species': Species, 'Price': Price, 'Winner' : 0}
+                        , ignore_index=True)
+                except:
+                    dfBids = dfBids.append({'SaleID': auctionSaleID, 'Bidder': 'manual',  'Species': 'manual', 'Price': 'manual', 'Winner' : 0}
+                        , ignore_index=True)
+    
+    time.sleep(random.uniform(1,3)*delay) # pause after grabbing the auction results to ease server load. Base delay on page load time
+
+# check results
 print(dfAuctions)
 print(dfAppraisals)
 print(dfBids)
 
+# push results to csv files
 dfAuctions.to_csv('ODF_Auctions.csv')
 dfAppraisals.to_csv('ODF_Appraisals.csv')
 dfBids.to_csv('ODF_Bids.csv')
